@@ -1,0 +1,5 @@
+service/cmpt756s1 created
+serviceaccount/svc-s1 created
+deployment.apps/cmpt756s1 created
+servicemonitor.monitoring.coreos.com/cmpt756s1 created
+virtualservice.networking.istio.io/cmpt756s1 created

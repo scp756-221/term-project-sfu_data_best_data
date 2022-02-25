@@ -1,0 +1,29 @@
+The push refers to repository [ghcr.io/qiushuo222/cmpt756s2]
+c70bdb95fca3: Preparing
+08fb72cf8b3d: Preparing
+7d47eba33370: Preparing
+933ff5d8bb1f: Preparing
+1d70a1a1f370: Preparing
+1c1dfd72029c: Preparing
+3382a8f4aa7e: Preparing
+3c08bad1e0e1: Preparing
+d80c74ef0232: Preparing
+3ba395cfe109: Preparing
+95cff0b90fb3: Preparing
+d80c74ef0232: Waiting
+3c08bad1e0e1: Waiting
+3382a8f4aa7e: Waiting
+95cff0b90fb3: Waiting
+1c1dfd72029c: Waiting
+933ff5d8bb1f: Layer already exists
+08fb72cf8b3d: Layer already exists
+c70bdb95fca3: Layer already exists
+7d47eba33370: Layer already exists
+1d70a1a1f370: Layer already exists
+3c08bad1e0e1: Layer already exists
+1c1dfd72029c: Layer already exists
+3382a8f4aa7e: Layer already exists
+3ba395cfe109: Layer already exists
+d80c74ef0232: Layer already exists
+95cff0b90fb3: Layer already exists
+v1: digest: sha256:0dfdea734de4cf35348e7c7e31ffa4b5f3d55874c4b8b7edc777f895208e5129 size: 2613

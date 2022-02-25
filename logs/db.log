@@ -1,0 +1,10 @@
+secret/awscred created
+serviceentry.networking.istio.io/dynamodb-us-west-2 created
+virtualservice.networking.istio.io/dynamodb-us-west-2 created
+service/cmpt756db created
+serviceaccount/svc-db created
+serviceaccount/svc-loader created
+secret/svc-loader-token created
+deployment.apps/cmpt756db created
+servicemonitor.monitoring.coreos.com/cmpt756db created
+virtualservice.networking.istio.io/cmpt756db created

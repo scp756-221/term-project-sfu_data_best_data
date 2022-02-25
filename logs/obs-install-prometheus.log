@@ -1,0 +1,4 @@
+helm install c756 --namespace istio-system prometheus-community/kube-prometheus-stack
+service/prom-ingress unchanged
+service/grafana-ingress unchanged
+configmap/c756-dashboard unchanged
