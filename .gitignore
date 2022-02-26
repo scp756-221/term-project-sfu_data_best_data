@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Makefiles
+k8s.mak
+eks.mak
+api.mak
+.DS_Store
+__pycache__
