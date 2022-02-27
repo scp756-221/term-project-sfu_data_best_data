@@ -21,7 +21,7 @@ KC=kubectl
 LOG_DIR=logs
 
 # these might need to change
-NS=c756ns
+NS=project-services
 CLUSTER_NAME=aws756
 EKS_CTX=aws756
 
