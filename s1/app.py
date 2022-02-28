@@ -42,7 +42,7 @@ db = {
 }
 
 
-@bp.route('/', methods=['GET'])
+@bp.route('/hello', methods=['GET'])
 @metrics.do_not_track()
 def hello_world():
     return ("If you are reading this in a browser, your service is "
@@ -122,6 +122,17 @@ def delete_user(user_id):
                                params={"objtype": "user", "objkey": user_id})
     return (response.json())
 
+
+@bp.route('/', methods=['GET'])
+def list_all():
+    headers = request.headers
+    # check header here
+    if 'Authorization' not in headers:
+        return Response(json.dumps({"error": "missing auth"}),
+                        status=401,
+                        mimetype='application/json')
+
+    return {}
 
 @bp.route('/<user_id>', methods=['GET'])
 def get_user(user_id):
