@@ -39,7 +39,8 @@ db = {
     "endpoint": [
         "read",
         "write",
-        "delete"
+        "delete",
+        "update"
     ]
 }
 bp = Blueprint('app', __name__)
@@ -66,6 +67,13 @@ def list_all():
                         status=401,
                         mimetype='application/json')
     # list all songs here
+    # payload = {"objtype": "music"}
+    # url = db['name'] + '/' + db['endpoint'][0]
+    # response = requests.get(
+    #     url,
+    #     params=payload,
+    #     headers={'Authorization': headers['Authorization']})
+    # return (response.json())
     return {}
 
 
@@ -123,6 +131,26 @@ def delete_song(music_id):
         headers={'Authorization': headers['Authorization']})
     return (response.json())
 
+@bp.route('/<music_id>', methods=['PUT'])
+def update_song(music_id):
+    headers = request.headers
+    # check header here
+    if 'Authorization' not in headers:
+        return Response(json.dumps({"error": "missing auth"}), status=401,
+                        mimetype='application/json')
+    try:
+        content = request.get_json()
+        artist = content['Artist']
+        song = content['SongTitle']
+
+    except Exception:
+        return json.dumps({"message": "error reading arguments"})
+    url = db['name'] + '/' + db['endpoint'][3]
+    response = requests.put(
+        url,
+        params={"objtype": "music", "objkey": music_id},
+        json={"Artist": artist, "SongTitle": song})
+    return (response.json())
 
 @bp.route('/test', methods=['GET'])
 def test():
