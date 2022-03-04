@@ -69,7 +69,7 @@ provision: istio prom deploy
 # --- deploy: Deploy and monitor the three microservices
 # Use `provision` to deploy the entire stack (including Istio, Prometheus, ...).
 # This target only deploys the sample microservices
-deploy: appns gw s1 s2 db monitoring
+deploy: appns gw s1 s2 playlist db monitoring
 	$(KC) -n $(APP_NS) get gw,vs,deploy,svc,pods
 
 # --- rollout: Rollout new deployments of all microservices
@@ -315,10 +315,10 @@ $(LOG_DIR)/s2-$(S2_VER).repo.log: s2/$(S2_VER)/Dockerfile s2/$(S2_VER)/app.py s2
 	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) s2/$(S2_VER) | tee $(LOG_DIR)/s2-$(S2_VER).img.log
 	$(DK) push $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) | tee $(LOG_DIR)/s2-$(S2_VER).repo.log
 
-# Build the s1 service
+# Build the playlist service
 $(LOG_DIR)/playlist.repo.log: playlist/Dockerfile playlist/app.py playlist/requirements.txt
 	make -f k8s.mak --no-print-directory registry-login
-	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) s1 | tee $(LOG_DIR)/playlist.img.log
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) playlist | tee $(LOG_DIR)/playlist.img.log
 	$(DK) push $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) | tee $(LOG_DIR)/playlist.repo.log
 
 # Build the db service
