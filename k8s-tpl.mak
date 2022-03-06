@@ -63,17 +63,17 @@ templates:
 # 2. Current context is a running Kubernetes cluster (make -f {az,eks,gcp,mk}.mak start)
 #
 #  Nov 2021: Kiali is causing problems so do not deploy
-#provision: istio prom kiali deploy
-provision: istio prom deploy
+provision: istio prom kiali deploy
+#provision: istio prom deploy
 
 # --- deploy: Deploy and monitor the three microservices
 # Use `provision` to deploy the entire stack (including Istio, Prometheus, ...).
 # This target only deploys the sample microservices
-deploy: appns gw s1 s2 db monitoring
+deploy: appns gw s1 s2 playlist db monitoring
 	$(KC) -n $(APP_NS) get gw,vs,deploy,svc,pods
 
 # --- rollout: Rollout new deployments of all microservices
-rollout: rollout-s1 rollout-s2 rollout-db
+rollout: rollout-s1 rollout-s2 rollout-pl rollout-db 
 
 # --- rollout-s1: Rollout a new deployment of S1
 rollout-s1: s1
@@ -83,6 +83,10 @@ rollout-s1: s1
 rollout-s2: $(LOG_DIR)/s2-$(S2_VER).repo.log  cluster/s2-dpl-$(S2_VER).yaml
 	$(KC) -n $(APP_NS) apply -f cluster/s2-dpl-$(S2_VER).yaml | tee $(LOG_DIR)/rollout-s2.log
 	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756s2-$(S2_VER) | tee -a $(LOG_DIR)/rollout-s2.log
+
+# --- rollout-playlist: Rollout a new deployment of playlist
+rollout-pl: playlist
+	$(KC) rollout -n $(APP_NS) restart deployment/playlist
 
 # --- rollout-db: Rollout a new deployment of DB
 rollout-db: db
@@ -177,6 +181,7 @@ loader: dynamodb-init $(LOG_DIR)/loader.repo.log cluster/loader.yaml
 	$(KC) -n $(APP_NS) delete --ignore-not-found=true jobs/cmpt756loader
 	tools/build-configmap.sh gatling/resources/users.csv cluster/users-header.yaml | kubectl -n $(APP_NS) apply -f -
 	tools/build-configmap.sh gatling/resources/music.csv cluster/music-header.yaml | kubectl -n $(APP_NS) apply -f -
+	tools/build-configmap.sh gatling/resources/playlist.csv cluster/playlist-header.yaml | kubectl -n $(APP_NS) apply -f -
 	$(KC) -n $(APP_NS) apply -f cluster/loader.yaml | tee $(LOG_DIR)/loader.log
 
 # --- dynamodb-init: set up our DynamoDB tables
@@ -287,6 +292,11 @@ s2: rollout-s2 cluster/s2-svc.yaml cluster/s2-sm.yaml cluster/s2-vs.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/s2-sm.yaml | tee -a $(LOG_DIR)/s2.log
 	$(KC) -n $(APP_NS) apply -f cluster/s2-vs.yaml | tee -a $(LOG_DIR)/s2.log
 
+playlist: $(LOG_DIR)/playlist.repo.log playlist/Dockerfile playlist/app.py playlist/requirements.txt
+	$(KC) -n $(APP_NS) apply -f cluster/playlist.yaml | tee $(LOG_DIR)/playlist.log
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml | tee -a $(LOG_DIR)/playlist.log
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs.yaml | tee -a $(LOG_DIR)/playlist.log
+
 # Update DB and associated monitoring, rebuilding if necessary
 db: $(LOG_DIR)/db.repo.log cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/awscred.yaml | tee $(LOG_DIR)/db.log
@@ -296,7 +306,7 @@ db: $(LOG_DIR)/db.repo.log cluster/awscred.yaml cluster/dynamodb-service-entry.y
 	$(KC) -n $(APP_NS) apply -f cluster/db-vs.yaml | tee -a $(LOG_DIR)/db.log
 
 # Build & push the images up to the CR
-cri: $(LOG_DIR)/s1.repo.log $(LOG_DIR)/s2-$(S2_VER).repo.log $(LOG_DIR)/db.repo.log
+cri: $(LOG_DIR)/s1.repo.log $(LOG_DIR)/s2-$(S2_VER).repo.log $(LOG_DIR)/playlist.repo.log $(LOG_DIR)/db.repo.log
 
 # Build the s1 service
 $(LOG_DIR)/s1.repo.log: s1/Dockerfile s1/app.py s1/requirements.txt
@@ -309,6 +319,12 @@ $(LOG_DIR)/s2-$(S2_VER).repo.log: s2/$(S2_VER)/Dockerfile s2/$(S2_VER)/app.py s2
 	make -f k8s.mak --no-print-directory registry-login
 	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) s2/$(S2_VER) | tee $(LOG_DIR)/s2-$(S2_VER).img.log
 	$(DK) push $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) | tee $(LOG_DIR)/s2-$(S2_VER).repo.log
+
+# Build the playlist service
+$(LOG_DIR)/playlist.repo.log: playlist/Dockerfile playlist/app.py playlist/requirements.txt
+	make -f k8s.mak --no-print-directory registry-login
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) playlist | tee $(LOG_DIR)/playlist.img.log
+	$(DK) push $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) | tee $(LOG_DIR)/playlist.repo.log
 
 # Build the db service
 $(LOG_DIR)/db.repo.log: db/Dockerfile db/app.py db/requirements.txt
