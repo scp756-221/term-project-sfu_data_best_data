@@ -1,5 +1,23 @@
 """
-Simple command-line interface to all micro services
+Simple command-line interface to all micro services:
+    1. Music service:
+        create - create a new music record
+        delete - delete a music record
+        update - update a music record
+        read -   read a music record
+    
+    2. User service:
+        create - create a new user record
+        delete - delete a user record
+        update - update a user record
+        read -   read a user record
+
+    3. Playlist service:
+        create -      create a new playlist record
+        delete -      delete a playlist record
+        addmusic -    add a music record in playlist
+        removemusic - remove a music record in playlist
+        read -        read a playlist record
 """
 
 # Standard library modules
@@ -102,12 +120,18 @@ class Mcli(cmd.Cmd):
                 headers={'Authorization': DEFAULT_AUTH}
                 )
             if r.status_code != 200:
-                print("Non-successful status code:", r.status_code)
+                print("Non-successful status code: {}, {}"
+                        .format(r.status_code, r.json()["error"]))
             items = r.json()
-            if 'Count' not in items:
+            if items == {}:
                 print("0 items returned")
                 return
+            if items['Count'] == 0:
+                print("0 items returned, can't find music")
+                return
+            
             print("{} items returned".format(items['Count']))
+
             for i in items["Items"]:
                 print("{}  {:20.20s} {}".format(
                     i['music_id'],
@@ -121,10 +145,14 @@ class Mcli(cmd.Cmd):
                 headers={'Authorization': DEFAULT_AUTH}
                 )
             if r.status_code != 200:
-                print("Non-successful status code:", r.status_code)
+                print("Non-successful status code: {}, {}"
+                        .format(r.status_code, r.json()["error"]))
             items = r.json()
-            if 'Count' not in items:
+            if items == {}:
                 print("0 items returned")
+                return
+            if items['Count'] == 0:
+                print("0 items returned, can't find user")
                 return
             print("{} items returned".format(items['Count']))
             for i in items['Items']:
@@ -134,6 +162,29 @@ class Mcli(cmd.Cmd):
                     i['lname'],
                     i["email"]))
 
+        # Connect playlist service
+        elif self.service == "playlist":
+            r = requests.get(
+                url+arg.strip(),
+                headers={'Authorization': DEFAULT_AUTH}
+                )
+            if r.status_code != 200:
+                print("Non-successful status code: {}, {}"
+                        .format(r.status_code, r.json()["error"]))
+            items = r.json()
+            if items == {}:
+                print("0 items returned")
+                return
+            if items['Count'] == 0:
+                print("0 items returned, can't find playlist")
+                return
+            print("{} items returned".format(items['Count']))
+            for i in items['Items']:
+                print("{}  {}".format(
+                    i['playlist_id'],
+                    i['music_list']
+                    )
+                )
 
     def do_create(self, arg):
         """
@@ -149,8 +200,13 @@ class Mcli(cmd.Cmd):
             fname: string
             lname: string
             email: string
+        
+        playlist:
+            music_list: string
 
         All parameters can be quoted by either single or double quotes.
+        For playlist, multiple music id must be quoted with single or double quotes,
+            and music id must can be found in music table.
 
         Examples
         --------
@@ -164,6 +220,9 @@ class Mcli(cmd.Cmd):
         user:
             create joey trib joey@sfu.ca
 
+        playlist:
+            create 26e6462c-eacf-40bb-b4d0-d683966e2624
+            create "26e6462c-eacf-40bb-b4d0-d683966e2624,c2573193-f333-49e2-abec-182915747756"
         """
         url = get_url(self.name, self.port, self.service)
         args = parse_quoted_strings(arg)
@@ -186,7 +245,7 @@ class Mcli(cmd.Cmd):
 
         elif self.service == "user":
             if len(args) != 3:
-                print("Not enough args provided {}".format(len(args)))
+                print("Not enough or too many args provided {}".format(len(args)))
                 return
 
             payload = {
@@ -200,6 +259,26 @@ class Mcli(cmd.Cmd):
                 headers={'Authorization': DEFAULT_AUTH}
             )
             print(r.json())
+
+        elif self.service == "playlist":
+            if len(args) == 0:
+                print("Not enough args provided {}".format(len(args)))
+                return
+
+            payload = {
+                'music_list': args[0]
+            }
+
+            r = requests.post(
+                url,
+                json=payload,
+                headers={'Authorization': DEFAULT_AUTH}
+            )
+            if r.status_code != 200:
+                print("Non-successful status code: {}, {}"
+                        .format(r.status_code, r.json()["error"]))
+            else:
+                print(r.json())
 
     def do_delete(self, arg):
         """
@@ -222,23 +301,39 @@ class Mcli(cmd.Cmd):
             Delete "George Clinton starchild@pfunk.org"
 
         """
-
         url = get_url(self.name, self.port, self.service)
-        if self.service == "music":
-            r = requests.delete(
-                url+arg.strip(),
-                headers={'Authorization': DEFAULT_AUTH}
-                )
-            if r.status_code != 200:
-                print("Non-successful status code:", r.status_code)
-        
-        elif self.service == "user":
-            r = requests.delete(
-                url+arg.strip(),
-                headers={'Authorization': DEFAULT_AUTH}
-                )
-            if r.status_code != 200:
-                print("Non-successful status code:", r.status_code)
+        args = parse_quoted_strings(arg)
+
+        if len(args) != 1:
+            print("Not enough or too many args provided {}".format(len(args)))
+            return
+        else:
+            if self.service == "music":
+                r = requests.delete(
+                    url+arg.strip(),
+                    headers={'Authorization': DEFAULT_AUTH}
+                    )
+                if r.status_code != 200:
+                    print("Non-successful status code: {}, {}"
+                            .format(r.status_code, r.json()["error"]))
+            
+            elif self.service == "user":
+                r = requests.delete(
+                    url+arg.strip(),
+                    headers={'Authorization': DEFAULT_AUTH}
+                    )
+                if r.status_code != 200:
+                    print("Non-successful status code: {}, {}"
+                            .format(r.status_code, r.json()["error"]))
+            
+            elif self.service == "playlist":
+                r = requests.delete(
+                    url+arg.strip(),
+                    headers={'Authorization': DEFAULT_AUTH}
+                    )
+                if r.status_code != 200:
+                    print("Non-successful status code: {}, {}"
+                            .format(r.status_code, r.json()["error"]))
 
     def do_update(self, arg):
         """
@@ -293,6 +388,53 @@ class Mcli(cmd.Cmd):
                 json=payload,
                 headers={'Authorization': DEFAULT_AUTH}
             )
+            self.do_read(args[0])
+        
+        else:
+            print("Wrong service")
+        
+    def do_addmusic(self, arg):
+        if self.service != "playlist":
+            print("Wrong service")
+            return
+        else:
+            url = get_url(self.name, self.port, self.service)
+            args = parse_quoted_strings(arg)
+            if len(args) != 2:
+                print("Not enough or too many args provided")
+                return
+
+            r = requests.put(
+                url+args[0].strip()+"/add/"+args[1],
+                headers={'Authorization': DEFAULT_AUTH}
+            )
+            if r.status_code != 200:
+                print("Non-successful status code: {}, {}"
+                        .format(r.status_code, r.json()["error"]))
+                return
+            
+            self.do_read(args[0])
+
+    def do_removemusic(self, arg):
+        if self.service != "playlist":
+            print("Wrong service")
+            return
+        else:
+            url = get_url(self.name, self.port, self.service)
+            args = parse_quoted_strings(arg)
+            if len(args) != 2:
+                print("Not enough or too many args provided")
+                return
+
+            r = requests.put(
+                url+args[0].strip()+"/remove/"+args[1],
+                headers={'Authorization': DEFAULT_AUTH}
+            )
+            if r.status_code != 200:
+                print("Non-successful status code: {}, {}"
+                        .format(r.status_code, r.json()["error"]))
+                return
+            
             self.do_read(args[0])
 
     def do_quit(self, arg):
