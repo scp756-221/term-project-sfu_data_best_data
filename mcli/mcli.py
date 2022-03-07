@@ -91,7 +91,7 @@ class Mcli(cmd.Cmd):
 
         Parameters
         ----------
-        ID:  music_id or user_id (optional)
+        ID:  music_id or user_id or playlist_id
             The id of the record to read. If not specified,
             return empty list
 
@@ -105,6 +105,9 @@ class Mcli(cmd.Cmd):
             read b66f61e7-4fad-402f-aaad-101e3e2522d3
                 Return b66f61e7-4fad-402f-aaad-101e3e2522d3 Clinton George starchild@pfunk.org.
 
+        playlist:
+            read 2faf54bf-b001-4297-8fea-86480254f6e0
+                Return b66f61e7-4fad-402f-aaad-101e3e2522d3 6ecfafd0-8a35-4af6-a9e2-cbd79b3abeea,c2573193-f333-49e2-abec-182915747756
         Notes
         -----
         Some versions of the server do not support listing
@@ -188,7 +191,7 @@ class Mcli(cmd.Cmd):
 
     def do_create(self, arg):
         """
-        Add a song or a user to the database.
+        Add a song or a user or a playlist to the database.
 
         Parameters
         ----------
@@ -282,7 +285,7 @@ class Mcli(cmd.Cmd):
 
     def do_delete(self, arg):
         """
-        Delete a song or a user.
+        Delete a song or a user or a playlist.
 
         Parameters
         ----------
@@ -290,16 +293,21 @@ class Mcli(cmd.Cmd):
             The music_id of the song to delete.
         
         user: user_id
-            The user_id of the user to delete
+            The user_id of the user to delete.
+
+        playlist: playlist_id
+            The playlist_id of the playlist to delete.
 
         Examples
         --------
         delete 6ecfafd0-8a35-4af6-a9e2-cbd79b3abeea
-            Delete "The Last Great American Dynasty".
+            Delete "The Last Great American Dynasty"
         
         delete b66f61e7-4fad-402f-aaad-101e3e2522d3
             Delete "George Clinton starchild@pfunk.org"
 
+        delete 2faf54bf-b001-4297-8fea-86480254f6e0
+            Delete "6ecfafd0-8a35-4af6-a9e2-cbd79b3abeea,c2573193-f333-49e2-abec-182915747756"
         """
         url = get_url(self.name, self.port, self.service)
         args = parse_quoted_strings(arg)
@@ -337,7 +345,7 @@ class Mcli(cmd.Cmd):
 
     def do_update(self, arg):
         """
-        Update a song or a user.
+        Update a song or a user or a playlist.
 
         Parameters
         ----------
@@ -347,6 +355,8 @@ class Mcli(cmd.Cmd):
         user: user_id user_fname user_lname user_email
             The user_id of the user to update
                 with user_fname, user_lname and user_email
+
+        playlist: not support 
 
         Examples
         --------
@@ -394,6 +404,24 @@ class Mcli(cmd.Cmd):
             print("Wrong service")
         
     def do_addmusic(self, arg):
+        """
+        Add a song into a playlist.
+
+        Parameters
+        ----------
+        playlist: playlist_id music_id
+            The playlist_id of the playlist to add with one song.
+            Supplied song id must be created in music service first.
+        
+        music: not support
+
+        user: not support
+
+        Examples
+        --------
+        addmusic 5d4dda29-ee79-4790-89a2-057cfe8ed5ba bb9e9105-6224-4a60-aabd-8d29cc4b1349
+            Add music "Isle of Dogs" in playlist.
+        """
         if self.service != "playlist":
             print("Wrong service")
             return
@@ -416,6 +444,24 @@ class Mcli(cmd.Cmd):
             self.do_read(args[0])
 
     def do_removemusic(self, arg):
+        """
+        Remove a song into a playlist.
+
+        Parameters
+        ----------
+        playlist: playlist_id music_id
+            The playlist_id of the playlist to remove with one song.
+            Supplied song id must be created in music service first.
+        
+        music: not support
+
+        user: not support
+
+        Examples
+        --------
+        removemusic c159d0f9-64d0-4173-b87c-755ddb732049 bb9e9105-6224-4a60-aabd-8d29cc4b1349
+            Remove music "Isle of Dogs" from playlist.
+        """
         if self.service != "playlist":
             print("Wrong service")
             return
