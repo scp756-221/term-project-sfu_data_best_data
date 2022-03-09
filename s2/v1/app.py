@@ -59,6 +59,7 @@ def readiness():
 
 
 @bp.route('/', methods=['GET'])
+@metrics.do_not_track()
 def list_all():
     headers = request.headers
     # check header here

@@ -62,6 +62,19 @@ def readiness():
     return Response("", status=200, mimetype="application/json")
 
 
+@bp.route('/', methods=['GET'])
+@metrics.do_not_track()
+def list_all():
+    headers = request.headers
+    # check header here
+    if 'Authorization' not in headers:
+        return Response(json.dumps({"error": "missing auth"}),
+                        status=401,
+                        mimetype='application/json')
+
+    return {}
+
+
 @bp.route('/<user_id>', methods=['PUT'])
 def update_user(user_id):
     headers = request.headers
@@ -121,18 +134,6 @@ def delete_user(user_id):
     response = requests.delete(url,
                                params={"objtype": "user", "objkey": user_id})
     return (response.json())
-
-
-@bp.route('/', methods=['GET'])
-def list_all():
-    headers = request.headers
-    # check header here
-    if 'Authorization' not in headers:
-        return Response(json.dumps({"error": "missing auth"}),
-                        status=401,
-                        mimetype='application/json')
-
-    return {}
 
 @bp.route('/<user_id>', methods=['GET'])
 def get_user(user_id):

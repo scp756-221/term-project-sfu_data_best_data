@@ -17,7 +17,7 @@ import simplejson as json
 app = Flask(__name__)
 
 metrics = PrometheusMetrics(app)
-metrics.info('app_info', 'Music process')
+metrics.info('app_info', 'Playlist process')
 
 db = {
     "name": "http://cmpt756db:30002/api/v1/datastore",
@@ -52,6 +52,7 @@ def readiness():
 
 
 @bp.route('/', methods=['GET'])
+@metrics.do_not_track()
 def list_all():
     headers = request.headers
     # check header here
