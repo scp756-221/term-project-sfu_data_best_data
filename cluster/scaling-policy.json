@@ -1,0 +1,8 @@
+{
+    "PredefinedMetricSpecification": {
+        "PredefinedMetricType": "DynamoDBReadCapacityUtilization"
+    },
+    "ScaleOutCooldown": 5,
+    "ScaleInCooldown": 5,
+    "TargetValue": 80.0
+}   

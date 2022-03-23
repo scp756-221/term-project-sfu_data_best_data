@@ -22,3 +22,7 @@ ZZ-AWS-ACCESS-KEY-ID=key_id
 # Replace 'key_value' with the access key value for your IAM administrative id.
 #
 ZZ-AWS-SECRET-ACCESS-KEY=key_value
+#
+# Replace 'aws_id' with the 12 digits aws id of your IAM acount.
+#
+AWS-ID=aws_id

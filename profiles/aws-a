@@ -102,7 +102,7 @@ alias s3mv='aws s3 mv '
 
 alias erun='make -f ${PROFILE} up'
 alias essh='make -f ${PROFILE} ssh'
-alias ekill='ekillid $(cat logs/x86-id.log)'
+alias ekill='ekillid $(cat ./x86-id.log)'
 
 alias armrun='make -f ${PROFILE} up-arm'
 alias armssh='make -f ${PROFILE} ssh-arm'
