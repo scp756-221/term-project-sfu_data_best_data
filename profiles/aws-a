@@ -62,13 +62,13 @@ ekn() {
     ekillid $(enameid ${1})
 }
 
-# usage: esshn <instance-name> <userid>
+# usage: esshn <instance-name>
 # SSH in to a named instance
 esshn() {
-    if [[ $# -ne 2 ]]; then
-      echo "Usage: esshn <instance-name> <userid>"
+    if [[ $# -ne 1 ]]; then
+      echo "Usage: esshn <instance-name>"
     else
-      make -f ${PROFILE} EC2_DNS=`enamedns ${1}` SSH_USER=${2} sshdns
+      make -f ${PROFILE} EC2_DNS=`enamedns ${1}` SSH_USER=ec2-user sshdns
     fi
 }
 

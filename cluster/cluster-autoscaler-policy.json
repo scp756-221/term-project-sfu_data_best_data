@@ -13,14 +13,6 @@
             ],
             "Resource": "*",
             "Effect": "Allow"
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-              "autoscaling:SetDesiredCapacity",
-              "autoscaling:TerminateInstanceInAutoScalingGroup"
-            ],
-            "Resource": ["*"]
         }
     ]
 }

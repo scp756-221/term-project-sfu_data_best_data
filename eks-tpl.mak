@@ -32,13 +32,30 @@ NTYPE=m4.xlarge
 REGION=ZZ-AWS-REGION
 KVER=1.21
 
+start: eks showcontext cluster/cluster-autoscaler-policy.json cluster/cluster-autoscaler-autodiscover.yaml
+	$(EKS) utils associate-iam-oidc-provider --cluster $(CLUSTER_NAME) --approve
+	$(AWS) iam create-policy \
+		--policy-name AmazonEKSClusterAutoscalerPolicy \
+		--policy-document file://cluster/cluster-autoscaler-policy.json || true
+	$(EKS) delete iamserviceaccount --cluster $(CLUSTER_NAME) --namespace=kube-system --name=cluster-autoscaler
+	sleep 10
+	$(EKS) create iamserviceaccount \
+		--cluster=$(CLUSTER_NAME) \
+		--namespace=kube-system \
+		--name=cluster-autoscaler \
+		--attach-policy-arn=arn:aws:iam::AWS-ID:policy/AmazonEKSClusterAutoscalerPolicy \
+		--override-existing-serviceaccounts \
+		--approve
+	$(KC) delete -n kube-system deployment/cluster-autoscaler --ignore-not-found=true
+	$(KC) apply -f cluster/cluster-autoscaler-autodiscover.yaml
 
-start: showcontext
+eks: showcontext
 	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 6 --nodes-min 4 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-start.log
 	# Use back-ticks for subshell because $(...) notation is used by make
 	$(KC) config rename-context `$(KC) config current-context` $(EKS_CTX) | tee -a $(LOG_DIR)/eks-start.log
 
 stop:
+	make -f k8s.mak scratch
 	$(EKS) delete cluster --name $(CLUSTER_NAME) --region $(REGION) | tee $(LOG_DIR)/eks-stop.log
 	$(KC) config delete-context $(EKS_CTX) | tee -a $(LOG_DIR)/eks-stop.log
 
@@ -73,27 +90,4 @@ cd:
 showcontext:
 	$(KC) config get-contexts
 
-eks-ac: cluster/cluster-autoscaler-policy.json cluster/cluster-autoscaler-autodiscover.yaml
-	$(EKS) utils associate-iam-oidc-provider --cluster $(CLUSTER_NAME) --approve
-	$(AWS) iam create-policy \
-		--policy-name AmazonEKSClusterAutoscalerPolicy \
-		--policy-document file://cluster/cluster-autoscaler-policy.json || true
-	$(EKS) create iamserviceaccount \
-		--cluster=$(CLUSTER_NAME) \
-		--namespace=kube-system \
-		--name=cluster-autoscaler \
-		--attach-policy-arn=arn:aws:iam::AWS-ID:policy/AmazonEKSClusterAutoscalerPolicy \
-		--override-existing-serviceaccounts \
-		--approve
-	$(KC) apply -f cluster/cluster-autoscaler-autodiscover.yaml
-	$(KC) annotate serviceaccount cluster-autoscaler \
-		-n kube-system \
-		eks.amazonaws.com/role-arn=arn:aws:iam::AWS-ID:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling \
-		--overwrite
-	$(KC) patch deployment cluster-autoscaler \
-		-n kube-system \
-		-p '{"spec":{"template":{"metadata":{"annotations":{"cluster-autoscaler.kubernetes.io/safe-to-evict": "false"}}}}}'
-	$(KC) -n kube-system edit deployment.apps/cluster-autoscaler
-	$(KC) set image deployment cluster-autoscaler \
-  		-n kube-system \
-  		cluster-autoscaler=k8s.gcr.io/autoscaling/cluster-autoscaler:v1.21.1
+
