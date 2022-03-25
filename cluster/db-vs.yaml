@@ -19,3 +19,4 @@ spec:
         host: cmpt756db
         port:
           number: 30002
+    timeout: 3s

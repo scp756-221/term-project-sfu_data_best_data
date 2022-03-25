@@ -286,6 +286,9 @@ monvs: cluster/monitoring-virtualservice.yaml
 # Update service gateway
 gw: cluster/service-gateway.yaml
 	$(KC) -n $(APP_NS) apply -f $< > $(LOG_DIR)/gw.log
+	$(KC) autoscale deploy/istio-egressgateway --cpu-percent=90 --min=5 --max=100 -n $(ISTIO_NS)
+	$(KC) autoscale deploy/istio-ingressgateway --cpu-percent=90 --min=10 --max=200 -n $(ISTIO_NS)
+	$(KC) autoscale deploy/istiod --cpu-percent=100 --min=10 --max=200 -n $(ISTIO_NS)
 
 # Update S1 and associated monitoring, rebuilding if necessary
 s1: $(LOG_DIR)/s1.repo.log cluster/s1.yaml cluster/s1-sm.yaml cluster/s1-vs.yaml
@@ -293,7 +296,8 @@ s1: $(LOG_DIR)/s1.repo.log cluster/s1.yaml cluster/s1-sm.yaml cluster/s1-vs.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/s1-sm.yaml | tee -a $(LOG_DIR)/s1.log
 	$(KC) -n $(APP_NS) apply -f cluster/s1-vs.yaml | tee -a $(LOG_DIR)/s1.log
 	$(KC) delete hpa cmpt756s1 || true
-	$(KC) autoscale deploy/cmpt756s1 --cpu-percent=80 --min=5 --max=300|| true
+	$(KC) autoscale deploy/cmpt756s1 --cpu-percent=95 --min=30 --max=300|| true
+#	$(KC) autoscale deploy/cmpt756s1 --cpu-percent=90 --min=5 --max=50|| true
 
 # Update S2 and associated monitoring, rebuilding if necessary
 s2: rollout-s2 cluster/s2-svc.yaml cluster/s2-sm.yaml cluster/s2-vs.yaml
@@ -301,14 +305,16 @@ s2: rollout-s2 cluster/s2-svc.yaml cluster/s2-sm.yaml cluster/s2-vs.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/s2-sm.yaml | tee -a $(LOG_DIR)/s2.log
 	$(KC) -n $(APP_NS) apply -f cluster/s2-vs.yaml | tee -a $(LOG_DIR)/s2.log
 	$(KC) delete hpa cmpt756s2-$(S2_VER) || true
-	$(KC) autoscale deploy/cmpt756s2-$(S2_VER) --cpu-percent=80 --min=5 --max=300|| true
+	$(KC) autoscale deploy/cmpt756s2-$(S2_VER) --cpu-percent=95 --min=30 --max=300|| true
+#	$(KC) autoscale deploy/cmpt756s2-$(S2_VER) --cpu-percent=90 --min=5 --max=50|| true
 
 playlist: $(LOG_DIR)/playlist.repo.log playlist/Dockerfile playlist/app.py playlist/requirements.txt
 	$(KC) -n $(APP_NS) apply -f cluster/playlist.yaml | tee $(LOG_DIR)/playlist.log
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml | tee -a $(LOG_DIR)/playlist.log
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs.yaml | tee -a $(LOG_DIR)/playlist.log
 	$(KC) delete hpa playlist || true
-	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=5 --max=300|| true
+	$(KC) autoscale deploy/playlist --cpu-percent=95 --min=30 --max=300|| true
+#	$(KC) autoscale deploy/playlist --cpu-percent=90 --min=5 --max=50|| true
 
 # Update DB and associated monitoring, rebuilding if necessary
 db: $(LOG_DIR)/db.repo.log cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs.yaml
@@ -318,7 +324,8 @@ db: $(LOG_DIR)/db.repo.log cluster/awscred.yaml cluster/dynamodb-service-entry.y
 	$(KC) -n $(APP_NS) apply -f cluster/db-sm.yaml | tee -a $(LOG_DIR)/db.log
 	$(KC) -n $(APP_NS) apply -f cluster/db-vs.yaml | tee -a $(LOG_DIR)/db.log
 	$(KC) delete hpa cmpt756db || true
-	$(KC) autoscale deploy/cmpt756db --cpu-percent=90 --min=10 --max=1000|| true
+	$(KC) autoscale deploy/cmpt756db --cpu-percent=90 --min=50 --max=500|| true
+#	$(KC) autoscale deploy/cmpt756db --cpu-percent=90 --min=10 --max=100|| true
 
 # Build & push the images up to the CR
 cri: $(LOG_DIR)/s1.repo.log $(LOG_DIR)/s2-$(S2_VER).repo.log $(LOG_DIR)/playlist.repo.log $(LOG_DIR)/db.repo.log
@@ -374,19 +381,19 @@ ac-db: cluster/scaling-policy.json
 		--service-namespace dynamodb \
 		--resource-id "table/Playlist-$(REGID)" \
 		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
-		--min-capacity 1000 \
+		--min-capacity 5000 \
 		--max-capacity 10000
 	$(AWS) application-autoscaling register-scalable-target \
 		--service-namespace dynamodb \
 		--resource-id "table/User-$(REGID)" \
 		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
-		--min-capacity 1000 \
+		--min-capacity 5000 \
 		--max-capacity 10000
 	$(AWS) application-autoscaling register-scalable-target \
 		--service-namespace dynamodb \
 		--resource-id "table/Music-$(REGID)" \
 		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
-		--min-capacity 1000 \
+		--min-capacity 5000 \
 		--max-capacity 10000
 	$(AWS) application-autoscaling put-scaling-policy \
 		--service-namespace dynamodb \

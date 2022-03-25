@@ -26,7 +26,8 @@ metadata:
     app: playlist
     version: v1
 spec:
-  replicas: 5
+  replicas: 30
+  # replicas: 5
   selector:
     matchLabels:
       app: playlist
@@ -47,12 +48,14 @@ spec:
         - containerPort: 30003
         resources:
           requests:
-            cpu: 200m
+            cpu: 100m
+          limits:
+            cpu: 100m
         livenessProbe:
           httpGet:
             path: /api/v1/playlist/health
             port: 30003
-          initialDelaySeconds: 300
+          initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 5
           successThreshold: 1
@@ -61,7 +64,7 @@ spec:
           httpGet:
             path: /api/v1/playlist/readiness
             port: 30003
-          initialDelaySeconds: 300
+          initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 5
           successThreshold: 1

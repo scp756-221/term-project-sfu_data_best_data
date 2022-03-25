@@ -41,7 +41,8 @@ metadata:
     app: cmpt756s1
     version: v1
 spec:
-  replicas: 5
+  replicas: 30
+  # replicas: 5
   selector:
     matchLabels:
       app: cmpt756s1
@@ -62,12 +63,14 @@ spec:
         - containerPort: 30000
         resources:
           requests:
-            cpu: 200m
+            cpu: 100m
+          limits:
+            cpu: 100m
         livenessProbe:
           httpGet:
             path: /api/v1/user/health
             port: 30000
-          initialDelaySeconds: 300
+          initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 5
           successThreshold: 1
@@ -76,7 +79,7 @@ spec:
           httpGet:
             path: /api/v1/user/readiness
             port: 30000
-          initialDelaySeconds: 300
+          initialDelaySeconds: 5
           periodSeconds: 5
           timeoutSeconds: 5
           successThreshold: 1

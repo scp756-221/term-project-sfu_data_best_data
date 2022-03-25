@@ -89,7 +89,7 @@ T2C4M16=t2.xlarge
 T2C8M32=t2.2xlarge
 
 # USD 0.10/hr
-M4C2M8=m4.large
+M4C2M8=m4.2xlarge
 M4C16M64=m4.4xlarge
 
 #==============================
