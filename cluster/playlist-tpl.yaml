@@ -27,7 +27,7 @@ metadata:
     version: v1
 spec:
   replicas: 30
-  # replicas: 5
+#  replicas: 5
   selector:
     matchLabels:
       app: playlist
@@ -48,9 +48,7 @@ spec:
         - containerPort: 30003
         resources:
           requests:
-            cpu: 100m
-          limits:
-            cpu: 100m
+            cpu: 200m
         livenessProbe:
           httpGet:
             path: /api/v1/playlist/health

@@ -21,4 +21,3 @@ spec:
         host: playlist
         port:
           number: 30003
-    timeout: 5s

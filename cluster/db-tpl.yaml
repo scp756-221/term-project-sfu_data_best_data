@@ -61,8 +61,8 @@ metadata:
     app: cmpt756db
     version: v1
 spec:
-  replicas: 50
-  # replicas: 10
+  replicas: 100
+  #replicas: 10
   selector:
     matchLabels:
       app: cmpt756db
@@ -93,9 +93,7 @@ spec:
         - containerPort: 30002
         resources:
           requests:
-            cpu: 100m
-          limits:
-            cpu: 100m
+            cpu: 200m
         livenessProbe:
           httpGet:
             path: /api/v1/datastore/health

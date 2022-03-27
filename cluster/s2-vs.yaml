@@ -44,5 +44,4 @@ spec:
         port:
           number: 30001
         subset: v1
-    timeout: 5s
       
