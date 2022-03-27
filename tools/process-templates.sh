@@ -36,7 +36,7 @@ vals=$(cut -f 2 -d= ./cluster/tpl-nocomments.txt)
 count_vals () {
   echo $#
 }
-if [[ `count_vals ${vals}` -ne 5 ]]; then
+if [[ `count_vals ${vals}` -ne 6 ]]; then
   echo "Some fields in 'cluster/tpl-vars.txt' are not filled in."
   exit 1
 fi

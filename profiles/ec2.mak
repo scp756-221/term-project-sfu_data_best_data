@@ -89,7 +89,7 @@ T2C4M16=t2.xlarge
 T2C8M32=t2.2xlarge
 
 # USD 0.10/hr
-M4C2M8=m4.large
+M4C2M8=m4.2xlarge
 M4C16M64=m4.4xlarge
 
 #==============================
@@ -179,13 +179,14 @@ HABANA_24X=dl1.24xlarge
 ifeq ($(REGION),us-west-2)
 
 # us-west-2
-AMI_UBUNTU20_X86=ami-036d46416a34a611c
+# AMI_UBUNTU20_X86=ami-036d46416a34a611c
+AMI_UBUNTU20_X86=ami-00ee4df451840fa9d
 AMI_UBUNTU20_ARM=ami-017d56f5127a80893 
 
 # Deep Learning AMI (Amazon Linux 2) Version 55.0
 # MXNet-1.8.0 & 1.7.0, TensorFlow-2.4.3, 2.3.4 & 1.15.5, PyTorch-1.7.1 & 1.8.1, Neuron, & others. NVIDIA CUDA, cuDNN, NCCL, Intel MKL-DNN, Docker, NVIDIA-Docker & EFA support. 
 # us-west-2
-AMI_AMAZON_LINUX_ML=ami-0a100c9a1c22dd744
+AMI_AMAZON_LINUX_ML=ami-06f147a89941af399
 # https://aws.amazon.com/releasenotes/deep-learning-ami-graviton-gpu-pytorch-1-10-ubuntu-20-04/
 AMI_UBUNTU_ML_ARM=ami-09901fdae1bac6fe0
 
@@ -294,9 +295,9 @@ else ifeq ($(PKG),)
 # DEFAULT package
 
 # Free tier
-INSTANCE=$(FREETIER)
-IMAGE=$(AMI_UBUNTU20_X86)
-SSH_USER=$(UBUNTU_USER)
+INSTANCE=$(M4C2M8)
+IMAGE=$(AMI_AMAZON_LINUX_ML)
+SSH_USER=$(AMAZON_USER)
 
 else
 

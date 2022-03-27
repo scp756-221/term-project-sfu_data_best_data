@@ -26,7 +26,8 @@ metadata:
     app: playlist
     version: v1
 spec:
-  replicas: 1
+  replicas: 30
+#  replicas: 5
   selector:
     matchLabels:
       app: playlist
@@ -45,19 +46,24 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 30003
+        resources:
+          requests:
+            cpu: 200m
         livenessProbe:
           httpGet:
             path: /api/v1/playlist/health
             port: 30003
-          initialDelaySeconds: 10
+          initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 5
+          successThreshold: 1
           failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /api/v1/playlist/readiness
             port: 30003
-          initialDelaySeconds: 10
+          initialDelaySeconds: 5
           periodSeconds: 5
-          timeoutSeconds: 2
+          timeoutSeconds: 5
           successThreshold: 1
           failureThreshold: 5

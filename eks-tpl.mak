@@ -16,7 +16,7 @@
 
 EKS=eksctl
 KC=kubectl
-
+AWS=aws
 # Keep all the logs out of main directory
 LOG_DIR=logs
 
@@ -27,22 +27,41 @@ EKS_CTX=aws756
 
 
 NGROUP=worker-nodes
-NTYPE=t3.medium
+# NTYPE=t3.medium
+NTYPE=c6a.2xlarge
 REGION=ZZ-AWS-REGION
 KVER=1.21
 
+start: eks showcontext cluster/cluster-autoscaler-policy.json cluster/cluster-autoscaler-autodiscover.yaml
+	$(EKS) utils associate-iam-oidc-provider --cluster $(CLUSTER_NAME) --approve
+	$(AWS) iam create-policy \
+		--policy-name AmazonEKSClusterAutoscalerPolicy \
+		--policy-document file://cluster/cluster-autoscaler-policy.json || true
+	$(EKS) delete iamserviceaccount --cluster $(CLUSTER_NAME) --namespace=kube-system --name=cluster-autoscaler
+	sleep 10
+	$(EKS) create iamserviceaccount \
+		--cluster=$(CLUSTER_NAME) \
+		--namespace=kube-system \
+		--name=cluster-autoscaler \
+		--attach-policy-arn=arn:aws:iam::AWS-ID:policy/AmazonEKSClusterAutoscalerPolicy \
+		--override-existing-serviceaccounts \
+		--approve
+	$(KC) delete -n kube-system deployment/cluster-autoscaler --ignore-not-found=true
+	$(KC) apply -f cluster/cluster-autoscaler-autodiscover.yaml
 
-start: showcontext
-	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 2 --nodes-min 2 --nodes-max 2 --managed | tee $(LOG_DIR)/eks-start.log
+eks: showcontext
+	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 5 --nodes-min 3 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-start.log
+#	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 3 --nodes-min 1 --nodes-max 60 --managed | tee $
 	# Use back-ticks for subshell because $(...) notation is used by make
 	$(KC) config rename-context `$(KC) config current-context` $(EKS_CTX) | tee -a $(LOG_DIR)/eks-start.log
 
 stop:
+	make -f k8s.mak scratch
 	$(EKS) delete cluster --name $(CLUSTER_NAME) --region $(REGION) | tee $(LOG_DIR)/eks-stop.log
 	$(KC) config delete-context $(EKS_CTX) | tee -a $(LOG_DIR)/eks-stop.log
 
 up:
-	$(EKS) create nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) --name $(NGROUP) --node-type $(NTYPE) --nodes 2 --nodes-min 2 --nodes-min 2 --managed | tee $(LOG_DIR)/eks-up.log
+	$(EKS) create nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) --name $(NGROUP) --node-type $(NTYPE) --nodes 5 --nodes-min 3 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-up.log
 
 down:
 	$(EKS) delete nodegroup --cluster=$(CLUSTER_NAME) --region $(REGION) --name=$(NGROUP) | tee $(LOG_DIR)/eks-down.log
@@ -71,4 +90,5 @@ cd:
 # Vendor-agnostic but subtarget of vendor-specific targets such as "start"
 showcontext:
 	$(KC) config get-contexts
+
 

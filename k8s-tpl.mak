@@ -63,13 +63,13 @@ templates:
 # 2. Current context is a running Kubernetes cluster (make -f {az,eks,gcp,mk}.mak start)
 #
 #  Nov 2021: Kiali is causing problems so do not deploy
-provision: istio prom kiali deploy
+provision: istio appns metric prom kiali deploy loader grafana-url prometheus-url kiali-url
 #provision: istio prom deploy
 
 # --- deploy: Deploy and monitor the three microservices
 # Use `provision` to deploy the entire stack (including Istio, Prometheus, ...).
 # This target only deploys the sample microservices
-deploy: appns gw s1 s2 playlist db monitoring
+deploy: gw s1 s2 playlist db monitoring
 	$(KC) -n $(APP_NS) get gw,vs,deploy,svc,pods
 
 # --- rollout: Rollout new deployments of all microservices
@@ -100,13 +100,18 @@ health-off:
 	$(KC) -n $(APP_NS) apply -f cluster/db-nohealth.yaml
 
 # --- scratch: Delete the microservices and everything else in application NS
-scratch: clean
+scratch: clean dynamodb-clean
 	$(KC) delete -n $(APP_NS) deploy --all
 	$(KC) delete -n $(APP_NS) svc    --all
 	$(KC) delete -n $(APP_NS) gw     --all
 	$(KC) delete -n $(APP_NS) dr     --all
 	$(KC) delete -n $(APP_NS) vs     --all
 	$(KC) delete -n $(APP_NS) se     --all
+	$(KC) delete -n $(APP_NS) --ignore-not-found=true jobs/cmpt756loader
+	$(KC) delete hpa cmpt756db --ignore-not-found=true
+	$(KC) delete hpa cmpt756s1 --ignore-not-found=true
+	$(KC) delete hpa cmpt756s2-$(S2_VER) --ignore-not-found=true
+	$(KC) delete hpa playlist --ignore-not-found=true
 	$(KC) delete -n $(ISTIO_NS) vs monitoring --ignore-not-found=true
 	$(KC) get -n $(APP_NS) deploy,svc,pods,gw,dr,vs,se
 	$(KC) get -n $(ISTIO_NS) vs
@@ -177,7 +182,7 @@ showcontext:
 	$(KC) config get-contexts
 
 # Run the loader, rebuilding if necessary, starting DynamDB if necessary, building ConfigMaps
-loader: dynamodb-init $(LOG_DIR)/loader.repo.log cluster/loader.yaml
+loader: dynamodb-init ac-db $(LOG_DIR)/loader.repo.log cluster/loader.yaml
 	$(KC) -n $(APP_NS) delete --ignore-not-found=true jobs/cmpt756loader
 	tools/build-configmap.sh gatling/resources/users.csv cluster/users-header.yaml | kubectl -n $(APP_NS) apply -f -
 	tools/build-configmap.sh gatling/resources/music.csv cluster/music-header.yaml | kubectl -n $(APP_NS) apply -f -
@@ -262,10 +267,12 @@ istio:
 	$(IC) install -y --set profile=demo --set hub=gcr.io/istio-release | tee -a $(LOG_DIR)/mk-reinstate.log
 
 # Create and configure the application namespace
-appns:
+appns: cluster/namespace.yaml
 	# Appended "|| true" so that make continues even when command fails
 	# because namespace already exists
-	$(KC) create ns $(APP_NS) || true
+	# $(KC) create ns $(APP_NS) || true
+	$(KC) apply -f cluster/namespace.yaml
+	$(KC) config set-context aws756 --namespace=$(APP_NS)
 	$(KC) label namespace $(APP_NS) --overwrite=true istio-injection=enabled
 
 # Update monitoring virtual service and display result
@@ -279,23 +286,40 @@ monvs: cluster/monitoring-virtualservice.yaml
 # Update service gateway
 gw: cluster/service-gateway.yaml
 	$(KC) -n $(APP_NS) apply -f $< > $(LOG_DIR)/gw.log
+#	$(KC) scale deploy/istio-egressgateway --replicas=5 -n $(ISTIO_NS) || true
+	$(KC) scale deploy/istio-ingressgateway --replicas=1 -n $(ISTIO_NS) || true
+	$(KC) autoscale deploy/istio-egressgateway --cpu-percent=90 --min=1 --max=20 -n $(ISTIO_NS) || true
+#	$(KC) autoscale deploy/istio-ingressgateway --cpu-percent=90 --min=50 --max=50 -n $(ISTIO_NS) || true
+#	$(KC) autoscale deploy/istiod --cpu-percent=90 --min=1 --max=20 -n $(ISTIO_NS) || true
 
 # Update S1 and associated monitoring, rebuilding if necessary
 s1: $(LOG_DIR)/s1.repo.log cluster/s1.yaml cluster/s1-sm.yaml cluster/s1-vs.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/s1.yaml | tee $(LOG_DIR)/s1.log
 	$(KC) -n $(APP_NS) apply -f cluster/s1-sm.yaml | tee -a $(LOG_DIR)/s1.log
 	$(KC) -n $(APP_NS) apply -f cluster/s1-vs.yaml | tee -a $(LOG_DIR)/s1.log
+	$(KC) delete hpa cmpt756s1 || true
+#	$(KC) autoscale deploy/cmpt756s1 --cpu-percent=80 --min=120 --max=430|| true
+	$(KC) autoscale deploy/cmpt756s1 --cpu-percent=80 --min=30 --max=430|| true
+#	$(KC) autoscale deploy/cmpt756s1 --cpu-percent=90 --min=5 --max=50|| true
 
 # Update S2 and associated monitoring, rebuilding if necessary
 s2: rollout-s2 cluster/s2-svc.yaml cluster/s2-sm.yaml cluster/s2-vs.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/s2-svc.yaml | tee $(LOG_DIR)/s2.log
 	$(KC) -n $(APP_NS) apply -f cluster/s2-sm.yaml | tee -a $(LOG_DIR)/s2.log
 	$(KC) -n $(APP_NS) apply -f cluster/s2-vs.yaml | tee -a $(LOG_DIR)/s2.log
+	$(KC) delete hpa cmpt756s2-$(S2_VER) || true
+#	$(KC) autoscale deploy/cmpt756s2-$(S2_VER) --cpu-percent=80 --min=120 --max=430|| true
+	$(KC) autoscale deploy/cmpt756s2-$(S2_VER) --cpu-percent=80 --min=30 --max=430|| true
+#	$(KC) autoscale deploy/cmpt756s2-$(S2_VER) --cpu-percent=90 --min=5 --max=50|| true
 
 playlist: $(LOG_DIR)/playlist.repo.log playlist/Dockerfile playlist/app.py playlist/requirements.txt
 	$(KC) -n $(APP_NS) apply -f cluster/playlist.yaml | tee $(LOG_DIR)/playlist.log
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml | tee -a $(LOG_DIR)/playlist.log
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs.yaml | tee -a $(LOG_DIR)/playlist.log
+	$(KC) delete hpa playlist || true
+#	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=120 --max=430|| true
+	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=30 --max=430|| true
+#	$(KC) autoscale deploy/playlist --cpu-percent=90 --min=5 --max=50|| true
 
 # Update DB and associated monitoring, rebuilding if necessary
 db: $(LOG_DIR)/db.repo.log cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs.yaml
@@ -304,6 +328,10 @@ db: $(LOG_DIR)/db.repo.log cluster/awscred.yaml cluster/dynamodb-service-entry.y
 	$(KC) -n $(APP_NS) apply -f cluster/db.yaml | tee -a $(LOG_DIR)/db.log
 	$(KC) -n $(APP_NS) apply -f cluster/db-sm.yaml | tee -a $(LOG_DIR)/db.log
 	$(KC) -n $(APP_NS) apply -f cluster/db-vs.yaml | tee -a $(LOG_DIR)/db.log
+	$(KC) delete hpa cmpt756db || true
+#	$(KC) autoscale deploy/cmpt756db --cpu-percent=80 --min=300 --max=500|| true
+	$(KC) autoscale deploy/cmpt756db --cpu-percent=80 --min=100 --max=500|| true
+#	$(KC) autoscale deploy/cmpt756db --cpu-percent=90 --min=10 --max=100|| true
 
 # Build & push the images up to the CR
 cri: $(LOG_DIR)/s1.repo.log $(LOG_DIR)/s2-$(S2_VER).repo.log $(LOG_DIR)/playlist.repo.log $(LOG_DIR)/db.repo.log
@@ -352,3 +380,49 @@ image: showcontext registry-login
 	head -n 1 __header
 	cat __content
 	rm __content __header
+
+# Create a scalable target for DynamoDB tables
+ac-db: cluster/scaling-policy.json
+	$(AWS) application-autoscaling register-scalable-target \
+		--service-namespace dynamodb \
+		--resource-id "table/Playlist-$(REGID)" \
+		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+		--min-capacity 5000 \
+		--max-capacity 10000
+	$(AWS) application-autoscaling register-scalable-target \
+		--service-namespace dynamodb \
+		--resource-id "table/User-$(REGID)" \
+		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+		--min-capacity 5000 \
+		--max-capacity 10000
+	$(AWS) application-autoscaling register-scalable-target \
+		--service-namespace dynamodb \
+		--resource-id "table/Music-$(REGID)" \
+		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+		--min-capacity 5000 \
+		--max-capacity 10000
+	$(AWS) application-autoscaling put-scaling-policy \
+		--service-namespace dynamodb \
+		--resource-id "table/Playlist-$(REGID)" \
+		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+		--policy-name "ScalingPolicy" \
+		--policy-type "TargetTrackingScaling" \
+		--target-tracking-scaling-policy-configuration file://$<
+	$(AWS) application-autoscaling put-scaling-policy \
+		--service-namespace dynamodb \
+		--resource-id "table/User-$(REGID)" \
+		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+		--policy-name "ScalingPolicy" \
+		--policy-type "TargetTrackingScaling" \
+		--target-tracking-scaling-policy-configuration file://$<
+	$(AWS) application-autoscaling put-scaling-policy \
+		--service-namespace dynamodb \
+		--resource-id "table/Music-$(REGID)" \
+		--scalable-dimension "dynamodb:table:ReadCapacityUnits" \
+		--policy-name "ScalingPolicy" \
+		--policy-type "TargetTrackingScaling" \
+		--target-tracking-scaling-policy-configuration file://$<
+
+metric:
+	$(KC) apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+	$(KC) get deployment metrics-server -n kube-system

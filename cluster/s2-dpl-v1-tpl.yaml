@@ -20,7 +20,8 @@ metadata:
     app: cmpt756s2
     version: v1
 spec:
-  replicas: 1
+  replicas: 30
+  #replicas: 5
   selector:
     matchLabels:
       app: cmpt756s2
@@ -42,19 +43,24 @@ spec:
             value: v1
         ports:
         - containerPort: 30001
+        resources:
+          requests:
+            cpu: 200m
         livenessProbe:
           httpGet:
             path: /api/v1/music/health
             port: 30001
-          initialDelaySeconds: 10
+          initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 5
+          successThreshold: 1
           failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /api/v1/music/readiness
             port: 30001
-          initialDelaySeconds: 10
+          initialDelaySeconds: 5
           periodSeconds: 5
-          timeoutSeconds: 2
+          timeoutSeconds: 5
           successThreshold: 1
           failureThreshold: 5
