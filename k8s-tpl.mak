@@ -426,3 +426,72 @@ ac-db: cluster/scaling-policy.json
 metric:
 	$(KC) apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 	$(KC) get deployment metrics-server -n kube-system
+	
+provision-delay: cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs-delay.yaml cluster/playlist.yaml cluster/playlist-sm.yaml cluster/playlist-vs-delay.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/db-vs-delay.yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756db
+	$(KC) delete hpa cmpt756db || true
+	$(KC) autoscale deploy/cmpt756db --cpu-percent=80 --min=100 --max=500|| true
+
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-delay.yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/playlist
+	$(KC) delete hpa playlist || true
+	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=30 --max=430|| true
+
+rollout-playlist-delay: provision-delay
+
+provision-abort: cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs-abort.yaml cluster/playlist.yaml cluster/playlist-sm.yaml cluster/playlist-vs-abort.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/db-vs-abort.yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756db
+	$(KC) delete hpa cmpt756db || true
+	$(KC) autoscale deploy/cmpt756db --cpu-percent=80 --min=100 --max=500|| true
+
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-abort.yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/playlist
+	$(KC) delete hpa playlist || true
+	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=30 --max=430|| true
+
+rollout-playlist-abort: provision-abort
+
+provision-circuit: cluster/playlist.yaml cluster/playlist-sm.yaml cluster/playlist-vs-circuit.yaml cluster/fortio-deploy.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-circuit.yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/playlist
+	$(KC) delete hpa playlist || true
+	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=30 --max=430|| true
+
+rollout-playlist-circuit: provision-circuit
+
+playlist-1: playlist/Dockerfile playlist/app.py playlist/requirements.txt
+	make -f k8s.mak --no-print-directory registry-login
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/playlist:v1 playlist
+	$(DK) push $(CREG)/$(REGID)/playlist:v1
+
+playlist-2: playlist/v2/Dockerfile playlist/v2/app.py playlist/v2/requirements.txt
+	make -f k8s.mak --no-print-directory registry-login
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/playlist:v2 playlist/v2
+	$(DK) push $(CREG)/$(REGID)/playlist:v2
+
+rollout-playlist-1: playlist-1 cluster/playlist1.yaml
+	$(KC) delete deployments playlist || true
+	$(KC) -n $(APP_NS) apply -f cluster/playlist1.yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/playlist-v1
+	$(KC) delete hpa playlist-v1 || true
+	$(KC) autoscale deploy/playlist-v1 --cpu-percent=80 --min=30 --max=430|| true
+
+rollout-playlist-2: playlist-2 cluster/playlist2.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist2.yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/playlist-v2
+	$(KC) delete hpa playlist-v2 || true
+	$(KC) autoscale deploy/playlist-v2 --cpu-percent=80 --min=30 --max=430|| true
+
+provision-canary: rollout-playlist-1 rollout-playlist-2 cluster/playlist.yaml cluster/playlist-sm.yaml cluster/playlist-vs-canary.yaml cluster/playlist-svc.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-svc.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-canary.yaml
+	
+	$(KC) delete hpa playlist || true
+
+reroute-playlist-1: rollout-playlist-1 cluster/playlist-sm.yaml cluster/playlist-vs-canary-reroute.yaml cluster/playlist-svc.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-canary-reroute.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-svc.yaml

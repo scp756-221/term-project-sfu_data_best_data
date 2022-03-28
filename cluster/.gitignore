@@ -12,3 +12,5 @@ awscred.yaml
 tpl-vars.txt
 *-token.txt
 cloudformationdynamodb.json
+playlist1.yaml
+playlist2.yaml

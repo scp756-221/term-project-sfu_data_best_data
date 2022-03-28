@@ -1,0 +1,46 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: playlist
+spec:
+  host: playlist
+  trafficPolicy:
+    connectionPool:
+      http:
+        http1MaxPendingRequests: 1
+#        http1MaxPendingRequests: 100
+        maxRequestsPerConnection: 999
+#        maxRequestsPerConnection: 2000
+    outlierDetection:
+      # Ejectiontime = baseEjectionTime * number of 500 errors
+      baseEjectionTime: 1m
+      # If return consecutive5xxErrors number of 500 errors, then eject
+      consecutive5xxErrors: 1
+      # Interval of ejection
+      interval: 10s
+      # Percent of host ejection
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: playlist
+spec:
+  hosts:
+  # We do not know the hostname of traffic from this gateway, so
+  # apply this VS to every request entering it.
+  - "*"
+  # As an externally-visible service, this only applies to the gateway
+  gateways:
+  - c756-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1/playlist
+    rewrite:
+      uri: /api/v1/playlist
+    route:
+    - destination:
+        host: playlist
+        port:
+          number: 30003
