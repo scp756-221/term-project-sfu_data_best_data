@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: playlist
+  labels:
+    app: playlist
+spec:
+  ports:
+  - port: 30003
+    name: http
+  selector:
+    app: playlist
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: svc-playlist
+  labels:
+    account: SVC_Playlist
