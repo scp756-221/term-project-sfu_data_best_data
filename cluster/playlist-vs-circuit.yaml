@@ -9,7 +9,7 @@ spec:
       http:
         http1MaxPendingRequests: 1
 #        http1MaxPendingRequests: 100
-        maxRequestsPerConnection: 999
+        maxRequestsPerConnection: 1
 #        maxRequestsPerConnection: 2000
     outlierDetection:
       # Ejectiontime = baseEjectionTime * number of 500 errors

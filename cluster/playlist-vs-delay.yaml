@@ -22,3 +22,4 @@ spec:
         port:
           number: 30003
     timeout: 4s
+#    timeout: 8s

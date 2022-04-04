@@ -50,7 +50,7 @@ start: eks showcontext cluster/cluster-autoscaler-policy.json cluster/cluster-au
 	$(KC) apply -f cluster/cluster-autoscaler-autodiscover.yaml
 
 eks: showcontext
-	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 5 --nodes-min 3 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-start.log
+	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-start.log
 #	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 3 --nodes-min 1 --nodes-max 60 --managed | tee $
 	# Use back-ticks for subshell because $(...) notation is used by make
 	$(KC) config rename-context `$(KC) config current-context` $(EKS_CTX) | tee -a $(LOG_DIR)/eks-start.log
@@ -61,7 +61,7 @@ stop:
 	$(KC) config delete-context $(EKS_CTX) | tee -a $(LOG_DIR)/eks-stop.log
 
 up:
-	$(EKS) create nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) --name $(NGROUP) --node-type $(NTYPE) --nodes 5 --nodes-min 3 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-up.log
+	$(EKS) create nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) --name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-up.log
 
 down:
 	$(EKS) delete nodegroup --cluster=$(CLUSTER_NAME) --region $(REGION) --name=$(NGROUP) | tee $(LOG_DIR)/eks-down.log
