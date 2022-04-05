@@ -286,11 +286,8 @@ monvs: cluster/monitoring-virtualservice.yaml
 # Update service gateway
 gw: cluster/service-gateway.yaml
 	$(KC) -n $(APP_NS) apply -f $< > $(LOG_DIR)/gw.log
-#	$(KC) scale deploy/istio-egressgateway --replicas=5 -n $(ISTIO_NS) || true
 	$(KC) scale deploy/istio-ingressgateway --replicas=1 -n $(ISTIO_NS) || true
 	$(KC) autoscale deploy/istio-egressgateway --cpu-percent=90 --min=1 --max=20 -n $(ISTIO_NS) || true
-#	$(KC) autoscale deploy/istio-ingressgateway --cpu-percent=90 --min=50 --max=50 -n $(ISTIO_NS) || true
-#	$(KC) autoscale deploy/istiod --cpu-percent=90 --min=1 --max=20 -n $(ISTIO_NS) || true
 
 # Update S1 and associated monitoring, rebuilding if necessary
 s1: $(LOG_DIR)/s1.repo.log cluster/s1.yaml cluster/s1-sm.yaml cluster/s1-vs.yaml
@@ -415,43 +412,23 @@ ac-db: cluster/scaling-policy.json
 		--policy-type "TargetTrackingScaling" \
 		--target-tracking-scaling-policy-configuration file://$<
 
+#==========Metric Server===========
 metric:
 	$(KC) apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 	$(KC) get deployment metrics-server -n kube-system
-	
-provision-delay: cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs-delay.yaml cluster/playlist.yaml cluster/playlist-sm.yaml cluster/playlist-vs-delay.yaml
+
+
+#==========For failure remediation===========
+provision-delay: cluster/db-vs-delay.yaml cluster/playlist-vs-delay.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/db-vs-delay.yaml
-	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756db
-	$(KC) delete hpa cmpt756db || true
-	$(KC) autoscale deploy/cmpt756db --cpu-percent=80 --min=100 --max=500|| true
-
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-delay.yaml
-	$(KC) rollout -n $(APP_NS) restart deployment/playlist
-	$(KC) delete hpa playlist || true
-	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=35 --max=430|| true
 
-rollout-playlist-delay: provision-delay
-
-provision-abort: cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs-abort.yaml cluster/playlist.yaml cluster/playlist-sm.yaml cluster/playlist-vs-abort.yaml
+provision-abort: cluster/db-vs-abort.yaml cluster/playlist-vs-abort.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/db-vs-abort.yaml
-	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756db
-	$(KC) delete hpa cmpt756db || true
-	$(KC) autoscale deploy/cmpt756db --cpu-percent=80 --min=100 --max=500|| true
-
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-abort.yaml
-	$(KC) rollout -n $(APP_NS) restart deployment/playlist
-	$(KC) delete hpa playlist || true
-	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=35 --max=430|| true
 
-rollout-playlist-abort: provision-abort
-
-provision-circuit: cluster/playlist.yaml cluster/playlist-sm.yaml cluster/playlist-vs-circuit.yaml
+provision-circuit: cluster/playlist-vs-circuit.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-circuit.yaml
-	$(KC) rollout -n $(APP_NS) restart deployment/playlist
-	$(KC) delete hpa playlist || true
-	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=35 --max=430|| true
-
-rollout-playlist-circuit: provision-circuit
 
 playlist-1: playlist/Dockerfile playlist/app.py playlist/requirements.txt
 	make -f k8s.mak --no-print-directory registry-login
@@ -483,7 +460,11 @@ provision-canary: rollout-playlist-1 rollout-playlist-2 cluster/playlist.yaml cl
 	
 	$(KC) delete hpa playlist || true
 
-reroute-playlist-1: rollout-playlist-1 cluster/playlist-sm.yaml cluster/playlist-vs-canary-reroute.yaml cluster/playlist-svc.yaml
-	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml
+reroute-playlist-1: cluster/playlist-vs-canary-reroute.yaml
 	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-canary-reroute.yaml
-	$(KC) -n $(APP_NS) apply -f cluster/playlist-svc.yaml
+
+reroute-playlist: rollout-playlist-2 cluster/playlist-vs-canary.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-canary.yaml
+
+reroute-playlist-2: cluster/playlist-vs-canary.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs-canary.yaml

@@ -51,7 +51,6 @@ start: eks showcontext cluster/cluster-autoscaler-policy.json cluster/cluster-au
 
 eks: showcontext
 	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-start.log
-#	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 3 --nodes-min 1 --nodes-max 60 --managed | tee $
 	# Use back-ticks for subshell because $(...) notation is used by make
 	$(KC) config rename-context `$(KC) config current-context` $(EKS_CTX) | tee -a $(LOG_DIR)/eks-start.log
 
