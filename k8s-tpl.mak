@@ -64,6 +64,8 @@ templates:
 #
 #  Nov 2021: Kiali is causing problems so do not deploy
 provision: istio appns metric prom kiali deploy loader grafana-url prometheus-url kiali-url
+#	Last step to scale istio-gateway to avoid crash on prometheus
+	$(KC) scale deploy/istio-ingressgateway --replicas=30 -n $(ISTIO_NS)
 #provision: istio prom deploy
 
 # --- deploy: Deploy and monitor the three microservices
