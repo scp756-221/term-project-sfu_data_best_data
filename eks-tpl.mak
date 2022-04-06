@@ -50,20 +50,20 @@ start: eks showcontext cluster/cluster-autoscaler-policy.json cluster/cluster-au
 	$(KC) apply -f cluster/cluster-autoscaler-autodiscover.yaml
 
 eks: showcontext
-	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-start.log
+	$(EKS) create cluster --name $(CLUSTER_NAME) --version $(KVER) --region $(REGION) --nodegroup-name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed
 	# Use back-ticks for subshell because $(...) notation is used by make
-	$(KC) config rename-context `$(KC) config current-context` $(EKS_CTX) | tee -a $(LOG_DIR)/eks-start.log
+	$(KC) config rename-context `$(KC) config current-context` $(EKS_CTX)
 
 stop:
 	make -f k8s.mak scratch
-	$(EKS) delete cluster --name $(CLUSTER_NAME) --region $(REGION) | tee $(LOG_DIR)/eks-stop.log
-	$(KC) config delete-context $(EKS_CTX) | tee -a $(LOG_DIR)/eks-stop.log
+	$(EKS) delete cluster --name $(CLUSTER_NAME) --region $(REGION)
+	$(KC) config delete-context $(EKS_CTX)
 
 up:
-	$(EKS) create nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) --name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed | tee $(LOG_DIR)/eks-up.log
+	$(EKS) create nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) --name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed
 
 down:
-	$(EKS) delete nodegroup --cluster=$(CLUSTER_NAME) --region $(REGION) --name=$(NGROUP) | tee $(LOG_DIR)/eks-down.log
+	$(EKS) delete nodegroup --cluster=$(CLUSTER_NAME) --region $(REGION) --name=$(NGROUP)
 
 # Show current context and all AWS clusters and nodegroups
 # This currently duplicates target "status"
@@ -78,8 +78,8 @@ lscl:
 	$(EKS) get cluster --region $(REGION) -v 0
 
 status: showcontext
-	$(EKS) get cluster --region $(REGION) | tee $(LOG_DIR)/eks-status.log
-	$(EKS) get nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) | tee -a $(LOG_DIR)/eks-status.log
+	$(EKS) get cluster --region $(REGION)
+	$(EKS) get nodegroup --cluster $(CLUSTER_NAME) --region $(REGION)
 
 # Only two $(KC) command in a vendor-specific Makefile
 # Set context to latest EKS cluster

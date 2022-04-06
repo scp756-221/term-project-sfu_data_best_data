@@ -42,28 +42,28 @@ init-helm:
 # note that the name $(RELEASE) is discretionary; it is used to reference the install 
 # Grafana is included within this Prometheus package
 install-prom:
-	echo $(HELM) install $(RELEASE) --namespace $(ISTIO_NS) prometheus-community/kube-prometheus-stack > $(LOG_DIR)/obs-install-prometheus.log
-	$(HELM) install $(RELEASE) -f helm-kube-stack-values.yaml --namespace $(ISTIO_NS) prometheus-community/kube-prometheus-stack | tee -a $(LOG_DIR)/obs-install-prometheus.log
-	$(KC) apply -n $(ISTIO_NS) -f monitoring-lb-services.yaml | tee -a $(LOG_DIR)/obs-install-prometheus.log
-	$(KC) apply -n $(ISTIO_NS) -f cluster/grafana-flask-configmap.yaml | tee -a $(LOG_DIR)/obs-install-prometheus.log
+	echo $(HELM) install $(RELEASE) --namespace $(ISTIO_NS) prometheus-community/kube-prometheus-stack
+	$(HELM) install $(RELEASE) -f cluster/helm-kube-stack-values.yaml --namespace $(ISTIO_NS) prometheus-community/kube-prometheus-stack  || true
+	$(KC) apply -n $(ISTIO_NS) -f cluster/monitoring-lb-services.yaml  || true
+	$(KC) apply -n $(ISTIO_NS) -f cluster/grafana-flask-configmap.yaml  || true
 
 uninstall-prom:
-	echo $(HELM) uninstall $(RELEASE) --namespace $(ISTIO_NS) > $(LOG_DIR)/obs-uninstall-prometheus.log
-	$(HELM) uninstall $(RELEASE) --namespace $(ISTIO_NS) | tee -a $(LOG_DIR)/obs-uninstall-prometheus.log
+	echo $(HELM) uninstall $(RELEASE) --namespace $(ISTIO_NS)
+	$(HELM) uninstall $(RELEASE) --namespace $(ISTIO_NS)
 
 install-kiali:
-	echo $(HELM) install --namespace $(ISTIO_NS) --set auth.strategy="anonymous" --repo https://kiali.org/helm-charts kiali-server kiali-server > $(LOG_DIR)/obs-kiali.log
+	echo $(HELM) install --namespace $(ISTIO_NS) --set auth.strategy="anonymous" --repo https://kiali.org/helm-charts kiali-server kiali-server
 	# This will fail every time after the first---the "|| true" suffix keeps Make running despite error
-	$(KC) create namespace $(KIALI_OP_NS) || true  | tee -a $(LOG_DIR)/obs-kiali.log
-	$(HELM) install --set cr.create=true --set cr.namespace=$(ISTIO_NS) --namespace $(KIALI_OP_NS) --repo https://kiali.org/helm-charts kiali-operator kiali-operator | tee -a $(LOG_DIR)/obs-kiali.log
-	$(KC) apply -n $(ISTIO_NS) -f kiali-cr.yaml | tee -a $(LOG_DIR)/obs-kiali.log
+	$(KC) create namespace $(KIALI_OP_NS) || true
+	$(HELM) install --set cr.create=true --set cr.namespace=$(ISTIO_NS) --namespace $(KIALI_OP_NS) --repo https://kiali.org/helm-charts kiali-operator kiali-operator || true
+	$(KC) apply -n $(ISTIO_NS) -f cluster/kiali-cr.yaml
 
 update-kiali:
-	$(KC) apply -n $(ISTIO_NS) -f kiali-cr.yaml | tee -a $(LOG_DIR)/obs-kiali.log
+	$(KC) apply -n $(ISTIO_NS) -f cluster/kiali-cr.yaml
 
 uninstall-kiali:
-	echo $(HELM) uninstall kiali-operator --namespace $(KIALI_OP_NS) > $(LOG_DIR)/obs-uninstall-kiali.log
-	$(HELM) uninstall kiali-operator --namespace $(KIALI_OP_NS) | tee -a $(LOG_DIR)/obs-uninstall-kiali.log
+	echo $(HELM) uninstall kiali-operator --namespace $(KIALI_OP_NS)
+	$(HELM) uninstall kiali-operator --namespace $(KIALI_OP_NS)
 
 status-kiali:
 	$(KC) get -n $(ISTIO_NS) pod -l 'app=kiali'
