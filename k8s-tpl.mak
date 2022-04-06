@@ -12,7 +12,6 @@
 #
 # The intended approach to working with this makefile is to update select
 # elements (body, id, IP, port, etc) as you progress through your workflow.
-# Where possible, stodout outputs are tee into .out files for later review.
 
 # These will be filled in by template processor
 CREG=ZZ-CR-ID
@@ -82,9 +81,9 @@ rollout-s1: s1
 	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756s1
 
 # --- rollout-s2: Rollout a new deployment of S2
-rollout-s2: $(LOG_DIR)/s2-$(S2_VER).repo.log  cluster/s2-dpl-$(S2_VER).yaml
-	$(KC) -n $(APP_NS) apply -f cluster/s2-dpl-$(S2_VER).yaml | tee $(LOG_DIR)/rollout-s2.log
-	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756s2-$(S2_VER) | tee -a $(LOG_DIR)/rollout-s2.log
+rollout-s2: s2-docker  cluster/s2-dpl-$(S2_VER).yaml
+	$(KC) -n $(APP_NS) apply -f cluster/s2-dpl-$(S2_VER).yaml
+	$(KC) rollout -n $(APP_NS) restart deployment/cmpt756s2-$(S2_VER)
 
 # --- rollout-playlist: Rollout a new deployment of playlist
 rollout-pl: playlist
@@ -102,7 +101,7 @@ health-off:
 	$(KC) -n $(APP_NS) apply -f cluster/db-nohealth.yaml
 
 # --- scratch: Delete the microservices and everything else in application NS
-scratch: clean dynamodb-clean
+scratch: dynamodb-clean
 	$(KC) delete -n $(APP_NS) deploy --all
 	$(KC) delete -n $(APP_NS) svc    --all
 	$(KC) delete -n $(APP_NS) gw     --all
@@ -117,10 +116,6 @@ scratch: clean dynamodb-clean
 	$(KC) delete -n $(ISTIO_NS) vs monitoring --ignore-not-found=true
 	$(KC) get -n $(APP_NS) deploy,svc,pods,gw,dr,vs,se
 	$(KC) get -n $(ISTIO_NS) vs
-
-# --- clean: Delete all the application log files
-clean:
-	/bin/rm -f $(LOG_DIR)/{s1,s2,db,gw,monvs}*.log $(LOG_DIR)/rollout*.log
 
 # --- dashboard: Start the standard Kubernetes dashboard
 # NOTE:  Before invoking this, the dashboard must be installed and a service account created
@@ -176,39 +171,35 @@ lsd:
 # Do this after you do `up` on a cluster that implements that operation.
 # AWS implements `up` and `down`; other cloud vendors may not.
 reinstate: istio
-	$(KC) create ns $(APP_NS) | tee $(LOG_DIR)/reinstate.log
-	$(KC) label ns $(APP_NS) istio-injection=enabled | tee -a $(LOG_DIR)/reinstate.log
+	$(KC) create ns $(APP_NS)
+	$(KC) label ns $(APP_NS) istio-injection=enabled
 
 # --- showcontext: Display current context
 showcontext:
 	$(KC) config get-contexts
 
 # Run the loader, rebuilding if necessary, starting DynamDB if necessary, building ConfigMaps
-loader: dynamodb-init ac-db $(LOG_DIR)/loader.repo.log cluster/loader.yaml
+loader: dynamodb-init ac-db loader-docker cluster/loader.yaml
 	$(KC) -n $(APP_NS) delete --ignore-not-found=true jobs/cmpt756loader
 	tools/build-configmap.sh gatling/resources/users.csv cluster/users-header.yaml | kubectl -n $(APP_NS) apply -f -
 	tools/build-configmap.sh gatling/resources/music.csv cluster/music-header.yaml | kubectl -n $(APP_NS) apply -f -
 	tools/build-configmap.sh gatling/resources/playlist.csv cluster/playlist-header.yaml | kubectl -n $(APP_NS) apply -f -
-	$(KC) -n $(APP_NS) apply -f cluster/loader.yaml | tee $(LOG_DIR)/loader.log
+	$(KC) -n $(APP_NS) apply -f cluster/loader.yaml
 
 # --- dynamodb-init: set up our DynamoDB tables
 #
-dynamodb-init: $(LOG_DIR)/dynamodb-init.log
-
+dynamodb-init: cluster/cloudformationdynamodb.json
 # Start DynamoDB at the default read and write rates
-$(LOG_DIR)/dynamodb-init.log: cluster/cloudformationdynamodb.json
 	@# "|| true" suffix because command fails when stack already exists
 	@# (even with --on-failure DO_NOTHING, a nonzero error code is returned)
-	$(AWS) cloudformation create-stack --stack-name db-ZZ-REG-ID --template-body file://$< || true | tee $(LOG_DIR)/dynamodb-init.log
+	$(AWS) cloudformation create-stack --stack-name db-ZZ-REG-ID --template-body file://$< || true
 	# Must give DynamoDB time to create the tables before running the loader
 	sleep 20
 
 # --- dynamodb-stop: Stop the AWS DynamoDB service
 #
 dynamodb-clean:
-	$(AWS) cloudformation delete-stack --stack-name db-ZZ-REG-ID || true | tee $(LOG_DIR)/dynamodb-clean.log
-	@# Rename DynamoDB log so dynamodb-init will force a restart but retain the log
-	/bin/mv -f $(LOG_DIR)/dynamodb-init.log $(LOG_DIR)/dynamodb-init-old.log || true
+	$(AWS) cloudformation delete-stack --stack-name db-ZZ-REG-ID || true
 
 # --- ls-tables: List the tables and their read/write units for all DynamodDB tables
 ls-tables:
@@ -266,7 +257,7 @@ kiali:
 
 # Install Istio
 istio:
-	$(IC) install -y --set profile=demo --set hub=gcr.io/istio-release | tee -a $(LOG_DIR)/mk-reinstate.log
+	$(IC) install -y --set profile=demo --set hub=gcr.io/istio-release
 
 # Create and configure the application namespace
 appns: cluster/namespace.yaml
@@ -283,86 +274,86 @@ monitoring: monvs
 
 # Update monitoring virtual service
 monvs: cluster/monitoring-virtualservice.yaml
-	$(KC) -n $(ISTIO_NS) apply -f $< > $(LOG_DIR)/monvs.log
+	$(KC) -n $(ISTIO_NS) apply -f $<
 
 # Update service gateway
 gw: cluster/service-gateway.yaml
-	$(KC) -n $(APP_NS) apply -f $< > $(LOG_DIR)/gw.log
+	$(KC) -n $(APP_NS) apply -f $< 
 	$(KC) scale deploy/istio-ingressgateway --replicas=1 -n $(ISTIO_NS) || true
 	$(KC) autoscale deploy/istio-egressgateway --cpu-percent=90 --min=1 --max=20 -n $(ISTIO_NS) || true
 
 # Update S1 and associated monitoring, rebuilding if necessary
-s1: $(LOG_DIR)/s1.repo.log cluster/s1.yaml cluster/s1-sm.yaml cluster/s1-vs.yaml
-	$(KC) -n $(APP_NS) apply -f cluster/s1.yaml | tee $(LOG_DIR)/s1.log
-	$(KC) -n $(APP_NS) apply -f cluster/s1-sm.yaml | tee -a $(LOG_DIR)/s1.log
-	$(KC) -n $(APP_NS) apply -f cluster/s1-vs.yaml | tee -a $(LOG_DIR)/s1.log
+s1: s1-docker cluster/s1.yaml cluster/s1-sm.yaml cluster/s1-vs.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/s1.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/s1-sm.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/s1-vs.yaml
 	$(KC) delete hpa cmpt756s1 || true
 	$(KC) autoscale deploy/cmpt756s1 --cpu-percent=80 --min=35 --max=430|| true
 
 # Update S2 and associated monitoring, rebuilding if necessary
 s2: rollout-s2 cluster/s2-svc.yaml cluster/s2-sm.yaml cluster/s2-vs.yaml
-	$(KC) -n $(APP_NS) apply -f cluster/s2-svc.yaml | tee $(LOG_DIR)/s2.log
-	$(KC) -n $(APP_NS) apply -f cluster/s2-sm.yaml | tee -a $(LOG_DIR)/s2.log
-	$(KC) -n $(APP_NS) apply -f cluster/s2-vs.yaml | tee -a $(LOG_DIR)/s2.log
+	$(KC) -n $(APP_NS) apply -f cluster/s2-svc.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/s2-sm.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/s2-vs.yaml
 	$(KC) delete hpa cmpt756s2-$(S2_VER) || true
 	$(KC) autoscale deploy/cmpt756s2-$(S2_VER) --cpu-percent=80 --min=35 --max=430|| true
 
-playlist: $(LOG_DIR)/playlist.repo.log playlist/Dockerfile playlist/app.py playlist/requirements.txt
-	$(KC) -n $(APP_NS) apply -f cluster/playlist.yaml | tee $(LOG_DIR)/playlist.log
-	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml | tee -a $(LOG_DIR)/playlist.log
-	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs.yaml | tee -a $(LOG_DIR)/playlist.log
+playlist: playlist-docker playlist/Dockerfile playlist/app.py playlist/requirements.txt
+	$(KC) -n $(APP_NS) apply -f cluster/playlist.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-sm.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/playlist-vs.yaml
 	$(KC) delete hpa playlist || true
 	$(KC) autoscale deploy/playlist --cpu-percent=80 --min=35 --max=430|| true
 
 # Update DB and associated monitoring, rebuilding if necessary
-db: $(LOG_DIR)/db.repo.log cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs.yaml
-	$(KC) -n $(APP_NS) apply -f cluster/awscred.yaml | tee $(LOG_DIR)/db.log
-	$(KC) -n $(APP_NS) apply -f cluster/dynamodb-service-entry.yaml | tee -a $(LOG_DIR)/db.log
-	$(KC) -n $(APP_NS) apply -f cluster/db.yaml | tee -a $(LOG_DIR)/db.log
-	$(KC) -n $(APP_NS) apply -f cluster/db-sm.yaml | tee -a $(LOG_DIR)/db.log
-	$(KC) -n $(APP_NS) apply -f cluster/db-vs.yaml | tee -a $(LOG_DIR)/db.log
+db: db-docker cluster/awscred.yaml cluster/dynamodb-service-entry.yaml cluster/db.yaml cluster/db-sm.yaml cluster/db-vs.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/awscred.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/dynamodb-service-entry.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/db.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/db-sm.yaml
+	$(KC) -n $(APP_NS) apply -f cluster/db-vs.yaml
 	$(KC) delete hpa cmpt756db || true
 	$(KC) autoscale deploy/cmpt756db --cpu-percent=80 --min=100 --max=500|| true
 
 # Build & push the images up to the CR
-cri: $(LOG_DIR)/s1.repo.log $(LOG_DIR)/s2-$(S2_VER).repo.log $(LOG_DIR)/playlist.repo.log $(LOG_DIR)/db.repo.log
+cri: s1-docker s2-docker playlist-docker db-docker
 
 # Build the s1 service
-$(LOG_DIR)/s1.repo.log: s1/Dockerfile s1/app.py s1/requirements.txt
+s1-docker: s1/Dockerfile s1/app.py s1/requirements.txt
 	make -f k8s.mak --no-print-directory registry-login
-	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756s1:$(APP_VER_TAG) s1 | tee $(LOG_DIR)/s1.img.log
-	$(DK) push $(CREG)/$(REGID)/cmpt756s1:$(APP_VER_TAG) | tee $(LOG_DIR)/s1.repo.log
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756s1:$(APP_VER_TAG) s1
+	$(DK) push $(CREG)/$(REGID)/cmpt756s1:$(APP_VER_TAG)
 
 # Build the s2 service
-$(LOG_DIR)/s2-$(S2_VER).repo.log: s2/$(S2_VER)/Dockerfile s2/$(S2_VER)/app.py s2/$(S2_VER)/requirements.txt
+s2-docker: s2/$(S2_VER)/Dockerfile s2/$(S2_VER)/app.py s2/$(S2_VER)/requirements.txt
 	make -f k8s.mak --no-print-directory registry-login
-	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) s2/$(S2_VER) | tee $(LOG_DIR)/s2-$(S2_VER).img.log
-	$(DK) push $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) | tee $(LOG_DIR)/s2-$(S2_VER).repo.log
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) s2/$(S2_VER)
+	$(DK) push $(CREG)/$(REGID)/cmpt756s2:$(S2_VER)
 
 # Build the playlist service
-$(LOG_DIR)/playlist.repo.log: playlist/Dockerfile playlist/app.py playlist/requirements.txt
+playlist-docker: playlist/Dockerfile playlist/app.py playlist/requirements.txt
 	make -f k8s.mak --no-print-directory registry-login
-	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) playlist | tee $(LOG_DIR)/playlist.img.log
-	$(DK) push $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) | tee $(LOG_DIR)/playlist.repo.log
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/playlist:$(APP_VER_TAG) playlist
+	$(DK) push $(CREG)/$(REGID)/playlist:$(APP_VER_TAG)
 
 # Build the db service
-$(LOG_DIR)/db.repo.log: db/Dockerfile db/app.py db/requirements.txt
+db-docker: db/Dockerfile db/app.py db/requirements.txt
 	make -f k8s.mak --no-print-directory registry-login
-	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756db:$(APP_VER_TAG) db | tee $(LOG_DIR)/db.img.log
-	$(DK) push $(CREG)/$(REGID)/cmpt756db:$(APP_VER_TAG) | tee $(LOG_DIR)/db.repo.log
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756db:$(APP_VER_TAG) db
+	$(DK) push $(CREG)/$(REGID)/cmpt756db:$(APP_VER_TAG)
 
 # Build the loader
-$(LOG_DIR)/loader.repo.log: loader/app.py loader/requirements.txt loader/Dockerfile registry-login
-	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756loader:$(LOADER_VER) loader  | tee $(LOG_DIR)/loader.img.log
-	$(DK) push $(CREG)/$(REGID)/cmpt756loader:$(LOADER_VER) | tee $(LOG_DIR)/loader.repo.log
+loader-docker: loader/app.py loader/requirements.txt loader/Dockerfile registry-login
+	$(DK) build $(ARCH) -t $(CREG)/$(REGID)/cmpt756loader:$(LOADER_VER) loader
+	$(DK) push $(CREG)/$(REGID)/cmpt756loader:$(LOADER_VER)
 
 # Push all the container images to the container registry
 # This isn't often used because the individual build targets also push
 # the updated images to the registry
 cr: registry-login
-	$(DK) push $(CREG)/$(REGID)/cmpt756s1:$(APP_VER_TAG) | tee $(LOG_DIR)/s1.repo.log
-	$(DK) push $(CREG)/$(REGID)/cmpt756s2:$(S2_VER) | tee $(LOG_DIR)/s2.repo.log
-	$(DK) push $(CREG)/$(REGID)/cmpt756db:$(APP_VER_TAG) | tee $(LOG_DIR)/db.repo.log
+	$(DK) push $(CREG)/$(REGID)/cmpt756s1:$(APP_VER_TAG)
+	$(DK) push $(CREG)/$(REGID)/cmpt756s2:$(S2_VER)
+	$(DK) push $(CREG)/$(REGID)/cmpt756db:$(APP_VER_TAG)
 
 # ---------------------------------------------------------------------------------------
 # Handy bits for exploring the container images... not necessary
