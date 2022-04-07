@@ -57,7 +57,7 @@ eks: showcontext
 stop:
 	make -f k8s.mak scratch
 	$(EKS) delete cluster --name $(CLUSTER_NAME) --region $(REGION)
-	$(KC) config delete-context $(EKS_CTX)
+	$(KC) config delete-context $(EKS_CTX) || true
 
 up:
 	$(EKS) create nodegroup --cluster $(CLUSTER_NAME) --region $(REGION) --name $(NGROUP) --node-type $(NTYPE) --nodes 7 --nodes-min 7 --nodes-max 30 --managed
